@@ -2,12 +2,12 @@
 #include "ui_add_remote_dialog.h"
 #include "ui_subscribe_dialog.h"
 
-#include <udp_bridge/ListRemotes.h>
-#include <udp_bridge/AddRemote.h>
-#include <udp_bridge/Subscribe.h>
+#include "udp_bridge_interfaces/srv/list_remotes.hpp"
+#include "udp_bridge_interfaces/srv/add_remote.hpp"
+#include "udp_bridge_interfaces/srv/subscribe.hpp"
 
-#include <pluginlib/class_list_macros.h>
-#include <ros/master.h>
+#include <pluginlib/class_list_macros.hpp>
+
 #include <QLineEdit>
 #include <QLabel>
 #include <QMessageBox>
@@ -90,34 +90,30 @@ void UDPBridgePlugin::updateNodeList()
 {
   std::vector<std::string> potential_nodes;
 
-  XmlRpc::XmlRpcValue request, response, payload;
-  request[0] = ros::this_node::getName();
-  if(ros::master::execute("getSystemState", request, response, payload, false))
+  auto services = node_->get_service_names_and_types();
+
+  for (const auto& service: services)
   {
-    if (payload.size() >= 3)
+    for (const auto& type: service.second)
     {
-      auto services = payload[2];
-      for(int i = 0; i < services.size(); i++)
+      if (type == "udp_bridge_interfaces/srv/ListRemotes")
       {
-        std::string service_name = services[i][0];
-        std::string lr("/list_remotes");
-        if(service_name.length() > lr.length())
-          if(service_name.substr(service_name.size()-lr.size()) == lr)
-            potential_nodes.push_back(service_name.substr(0,service_name.size()-lr.size()));
+        potential_nodes.push_back(service.first.substr(0, service.first.find("/list_remotes")));
       }
     }
   }
+
   QList<QString> nodes;
 
   for(auto node: potential_nodes)
   {
-    auto service_client = ros::service::createClient<udp_bridge::ListRemotes>(node+"/list_remotes");
-    if(service_client.exists())
+    auto service_client = node_->create_client<udp_bridge_interfaces::srv::ListRemotes>(node+"/list_remotes");
+    if(service_client->service_is_ready())
       nodes.append(node.c_str());
   }
 
   nodes.append("");
-  qSort(nodes);
+  std::sort(nodes.begin(), nodes.end());
 
   QString selected = ui_.nodesComboBox->currentText();
 
@@ -158,7 +154,7 @@ void UDPBridgePlugin::onNodeChanged(int index)
 
   QString node = ui_.nodesComboBox->itemData(index).toString();
   node_namespace_ = node.toStdString();
-  bridge_node_->setTopicsPrefix(getNodeHandle(), node_namespace_, true);
+  bridge_node_->setTopicsPrefix(node_, node_namespace_, true);
 }
 
 void UDPBridgePlugin::addRemote()
@@ -168,22 +164,22 @@ void UDPBridgePlugin::addRemote()
   addRemoteDialogUI.setupUi(&addRemoteDialog);
   if(addRemoteDialog.exec())
   {
-    udp_bridge::AddRemote add_remote;
-    add_remote.request.name = addRemoteDialogUI.nameLineEdit->text().toStdString();
-    add_remote.request.connection_id = addRemoteDialogUI.connectionLineEdit->text().toStdString();
-    add_remote.request.address = addRemoteDialogUI.addressLineEdit->text().toStdString();
-    add_remote.request.port = addRemoteDialogUI.portLineEdit->text().toInt();
-    add_remote.request.return_address = addRemoteDialogUI.returnAddressLineEdit->text().toStdString();
+    auto add_remote = std::make_shared<udp_bridge_interfaces::srv::AddRemote::Request>();
+    add_remote->name = addRemoteDialogUI.nameLineEdit->text().toStdString();
+    add_remote->connection_id = addRemoteDialogUI.connectionLineEdit->text().toStdString();
+    add_remote->address = addRemoteDialogUI.addressLineEdit->text().toStdString();
+    add_remote->port = addRemoteDialogUI.portLineEdit->text().toInt();
+    add_remote->return_address = addRemoteDialogUI.returnAddressLineEdit->text().toStdString();
     bool ok;
     uint16_t return_port = addRemoteDialogUI.returnPortLineEdit->text().toUInt(&ok);
     if(ok)
-      add_remote.request.return_port = return_port;
+      add_remote->return_port = return_port;
     uint32_t max_rate = addRemoteDialogUI.rateLimitLineEdit->text().toUInt(&ok);
     if(ok)
-      add_remote.request.maximum_bytes_per_second = max_rate;
+      add_remote->maximum_bytes_per_second = max_rate;
     max_rate = addRemoteDialogUI.returnRateLimitLineEdit->text().toUInt(&ok);
     if(ok)
-      add_remote.request.return_maximum_bytes_per_second = max_rate;
+      add_remote->return_maximum_bytes_per_second = max_rate;
     
     if(!bridge_node_->addRemote(add_remote))
     {
@@ -231,13 +227,13 @@ void UDPBridgePlugin::subscribe(bool remote_advertise)
 
   if(dialog.exec())
   {
-    udp_bridge::Subscribe s;
-    s.request.remote = dialog_ui.remoteComboBox->currentText().toStdString();
-    s.request.connection_id = dialog_ui.connectionComboBox->currentText().toStdString();
-    s.request.source_topic = dialog_ui.sourceTopicComboBox->currentText().toStdString();
-    s.request.destination_topic = dialog_ui.destinationTopicLineEdit->text().toStdString();
-    s.request.queue_size = dialog_ui.queueSizeSpinBox->value();
-    s.request.period = dialog_ui.periodLineEdit->text().toFloat();
+    auto s = std::make_shared<udp_bridge_interfaces::srv::Subscribe::Request>();
+    s->remote = dialog_ui.remoteComboBox->currentText().toStdString();
+    s->connection_id = dialog_ui.connectionComboBox->currentText().toStdString();
+    s->source_topic = dialog_ui.sourceTopicComboBox->currentText().toStdString();
+    s->destination_topic = dialog_ui.destinationTopicLineEdit->text().toStdString();
+    s->queue_size = dialog_ui.queueSizeSpinBox->value();
+    s->period = dialog_ui.periodLineEdit->text().toFloat();
     if(remote_advertise)
     {
       if(!bridge_node_->remoteAdvertise(s))

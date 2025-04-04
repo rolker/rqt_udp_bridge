@@ -1,27 +1,28 @@
-cmake_minimum_required(VERSION 2.8.3)
+cmake_minimum_required(VERSION 3.14.4)
 project(rqt_udp_bridge)
 
-add_compile_options(-std=c++14)
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 17)
+endif()
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
 
-find_package(catkin REQUIRED COMPONENTS
-    roscpp
-    roslint
-    rqt_gui
-    rqt_gui_cpp
-    udp_bridge
-)
+
+find_package(ament_cmake REQUIRED)
+find_package(qt_gui_cpp REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(rqt_gui_cpp REQUIRED)
+find_package(udp_bridge_interfaces REQUIRED)
+
+set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTORCC ON)
 
-if(CMAKE_VERSION VERSION_LESS "3.7.0")
-  set(CMAKE_INCLUDE_CURRENT_DIR ON)
-endif()
 
 find_package(Qt5 COMPONENTS Widgets REQUIRED)
-
-roslint_cpp()
 
 set(rqt_udp_bridge_SRCS
   src/udp_bridge_plugin.cpp
@@ -39,61 +40,49 @@ set(rqt_udp_bridge_UIS
   src/subscribe_dialog.ui
 )
 
-set(rqt_udp_bridge_INCLUDE_DIRECTORIES
-  include
-  "${CATKIN_DEVEL_PREFIX}/${CATKIN_GLOBAL_INCLUDE_DESTINATION}"
-)
-if(NOT EXISTS "${CATKIN_DEVEL_PREFIX}/${CATKIN_GLOBAL_INCLUDE_DESTINATION}")
-  file(MAKE_DIRECTORY "${CATKIN_DEVEL_PREFIX}/${CATKIN_GLOBAL_INCLUDE_DESTINATION}")
-endif()
-
-catkin_package(
-  INCLUDE_DIRS ${rqt_udp_bridge_INCLUDE_DIRECTORIES}
-  LIBRARIES ${PROJECT_NAME}
-  CATKIN_DEPENDS roscpp rqt_gui_cpp rqt_gui udp_bridge
-#  DEPENDS system_lib
-)
 
 qt5_wrap_cpp(rqt_udp_bridge_MOCS ${rqt_udp_bridge_HDRS})
 
-set(_cmake_current_binary_dir "${CMAKE_CURRENT_BINARY_DIR}")
-set(CMAKE_CURRENT_BINARY_DIR "${CATKIN_DEVEL_PREFIX}/${CATKIN_GLOBAL_INCLUDE_DESTINATION}")
 qt5_wrap_ui(rqt_udp_bridge_UIS_H ${rqt_udp_bridge_UIS})
-set(CMAKE_CURRENT_BINARY_DIR "${_cmake_current_binary_dir}")
 
-include_directories(
-    ${rqt_udp_bridge_INCLUDE_DIRECTORIES}
-    ${catkin_INCLUDE_DIRS}
-)
-
-add_library(${PROJECT_NAME}
+add_library(${PROJECT_NAME} SHARED
     ${rqt_udp_bridge_SRCS}
     ${rqt_udp_bridge_MOCS}
     ${rqt_udp_bridge_UIS_H}
 )
 
-qt5_use_modules(${PROJECT_NAME} Widgets)
+target_include_directories(${PROJECT_NAME} PUBLIC
+  "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+  "$<INSTALL_INTERFACE:include/${PROJECT_NAME}>")
 
-target_link_libraries(${PROJECT_NAME}
-    ${QT_LIBRARIES}
-    ${catkin_LIBRARIES}
+target_link_libraries(${PROJECT_NAME} PUBLIC
+  ${rclcpp_TARGETS}
+  ${qt_gui_cpp_TARGETS}
+  ${rqt_gui_cpp_TARGETS}
+  Qt5::Widgets
+  ${udp_bridge_interfaces_TARGETS}
 )
 
-find_package(class_loader)
-class_loader_hide_library_symbols(${PROJECT_NAME})
-
-
-install(FILES
-  plugin.xml
-  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+install(
+  TARGETS ${PROJECT_NAME}
+  EXPORT ${PROJECT_NAME}
+  ARCHIVE DESTINATION lib/${PROJECT_NAME}
+  LIBRARY DESTINATION lib/${PROJECT_NAME}
+  RUNTIME DESTINATION bin/${PROJECT_NAME}
 )
 
-install(TARGETS ${PROJECT_NAME}
-  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION}
+install(FILES plugin.xml
+  DESTINATION share/${PROJECT_NAME}
 )
 
-install(DIRECTORY include/${PROJECT_NAME}/
-  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+install(
+  DIRECTORY include/
+  DESTINATION include/${PROJECT_NAME}
 )
+
+pluginlib_export_plugin_description_file(rqt_gui "plugin.xml")
+
+ament_export_include_directories("include/${PROJECT_NAME}")
+ament_export_libraries(${PROJECT_NAME})
+ament_export_targets(${PROJECT_NAME})
+ament_package()

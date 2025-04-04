@@ -1,12 +1,12 @@
 #ifndef RQT_UDP_BRIDGE_UDP_BRIDGE_PLUGIN_H
 #define RQT_UDP_BRIDGE_UDP_BRIDGE_PLUGIN_H
 
-#include <rqt_gui_cpp/plugin.h>
-#include <ui_udp_bridge_plugin.h>
-#include <ros/ros.h>
-#include <udp_bridge/TopicStatisticsArray.h>
-#include <udp_bridge/BridgeInfo.h>
-#include <rqt_udp_bridge/bridge_node.h>
+#include "rqt_gui_cpp/plugin.h"
+#include "ui_udp_bridge_plugin.h"
+#include "rclcpp/rclcpp.hpp"
+#include "udp_bridge_interfaces/msg/topic_statistics_array.hpp"
+#include "udp_bridge_interfaces/msg/bridge_info.hpp"
+#include "rqt_udp_bridge/bridge_node.h"
 
 class QLabel;
 

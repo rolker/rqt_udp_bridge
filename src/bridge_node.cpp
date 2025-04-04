@@ -1,9 +1,12 @@
-#include <rqt_udp_bridge/bridge_node.h>
-#include <udp_bridge/AddRemote.h>
-#include <udp_bridge/Subscribe.h>
+#include "rqt_udp_bridge/bridge_node.h"
+#include "udp_bridge_interfaces/srv/add_remote.hpp"
+#include "udp_bridge_interfaces/srv/subscribe.hpp"
 
 namespace rqt_udp_bridge
 {
+
+using namespace udp_bridge_interfaces::msg;
+using namespace udp_bridge_interfaces::srv;
 
 BridgeNode::BridgeNode(QObject* parent):
   QObject(parent)
@@ -19,11 +22,11 @@ void BridgeNode::clear()
 {
   local_ = false;
   node_namespace_.clear();
-  topic_statistics_subscriber_.shutdown();
-  bridge_info_subscriber_.shutdown();
-  add_remote_service_.shutdown();
-  remote_advertise_service_.shutdown();
-  remote_subscribe_service_.shutdown();
+  topic_statistics_subscriber_.reset();
+  bridge_info_subscriber_.reset();
+  add_remote_service_.reset();
+  remote_advertise_service_.reset();
+  remote_subscribe_service_.reset();
   topics_model_.clear();
   remotes_model_.clear();
 
@@ -33,7 +36,7 @@ void BridgeNode::clear()
 
 }
 
-void BridgeNode::setTopicsPrefix(ros::NodeHandle& node_handle, std::string node_namespace, bool local)
+void BridgeNode::setTopicsPrefix(rclcpp::Node::SharedPtr node, std::string node_namespace, bool local)
 {
   clear();
 
@@ -65,14 +68,14 @@ void BridgeNode::setTopicsPrefix(ros::NodeHandle& node_handle, std::string node_
   remotes_labels.push_back("resend sent drop");
   remotes_model_.setHorizontalHeaderLabels(remotes_labels);
 
-  topic_statistics_subscriber_ = node_handle.subscribe(node_namespace+"/topic_statistics", 1, &BridgeNode::topicStatisticsCallback, this);
-  bridge_info_subscriber_ = node_handle.subscribe(node_namespace+"/bridge_info", 1, &BridgeNode::bridgeInfoCallback, this);
+  topic_statistics_subscriber_ = node->create_subscription<TopicStatisticsArray>(node_namespace+"/topic_statistics", 1, std::bind(&BridgeNode::topicStatisticsCallback, this, std::placeholders::_1));
+  bridge_info_subscriber_ = node->create_subscription<BridgeInfo>(node_namespace+"/bridge_info", 1, std::bind(&BridgeNode::bridgeInfoCallback, this, std::placeholders::_1));
 
   if(local_)
   {
-    add_remote_service_ = ros::service::createClient<udp_bridge::AddRemote>(node_namespace+"/add_remote");
-    remote_advertise_service_ = ros::service::createClient<udp_bridge::Subscribe>(node_namespace+"/remote_advertise");
-    remote_subscribe_service_ = ros::service::createClient<udp_bridge::Subscribe>(node_namespace+"/remote_subscribe");
+    add_remote_service_ = node->create_client<AddRemote>(node_namespace+"/add_remote");
+    remote_advertise_service_ = node->create_client<Subscribe>(node_namespace+"/remote_advertise");
+    remote_subscribe_service_ = node->create_client<Subscribe>(node_namespace+"/remote_subscribe");
   }
 }
 
@@ -146,7 +149,7 @@ void setData(QStandardItemModel& model, int row, const std::vector<QString> &val
   }
 }
 
-void BridgeNode::bridgeInfoCallback(const udp_bridge::BridgeInfo::ConstPtr& bridge_info)
+void BridgeNode::bridgeInfoCallback(BridgeInfo::UniquePtr bridge_info)
 {
   std::lock_guard<std::mutex> lock(bridge_info_mutex_);
   bridge_info_ = *bridge_info;
@@ -303,14 +306,14 @@ void BridgeNode::bridgeInfoUpdated()
       if(remote_iterator == remotes_.end())
       {
         remotes_[remote.name] = new BridgeNode(this);
-        remotes_[remote.name]->setTopicsPrefix(node_handle_, node_namespace_+"/remotes/"+remote.topic_name, false);
+        remotes_[remote.name]->setTopicsPrefix(node_, node_namespace_+"/remotes/"+remote.topic_name, false);
       }
     }
 
   }
 }
 
-void BridgeNode::topicStatisticsCallback(const udp_bridge::TopicStatisticsArray::ConstPtr& topic_statistics_array)
+void BridgeNode::topicStatisticsCallback(TopicStatisticsArray::UniquePtr topic_statistics_array)
 {
   std::lock_guard<std::mutex> lock(topic_statistics_array_mutex_);
   topic_statistics_array_ = *topic_statistics_array;
@@ -377,19 +380,43 @@ void BridgeNode::topicStatisticsUpdated()
 
 }
 
-bool BridgeNode::addRemote(udp_bridge::AddRemote & add_remote)
+bool BridgeNode::addRemote(std::shared_ptr<AddRemote::Request> add_remote)
 {
-  return add_remote_service_.call(add_remote);
+  auto result = add_remote_service_->async_send_request(add_remote);
+  // Wait for the result.
+  if (rclcpp::spin_until_future_complete(node_, result) ==
+    rclcpp::FutureReturnCode::SUCCESS)
+  {
+    return true;
+  } else {
+    return false;
+  }
 }
 
-bool BridgeNode::remoteAdvertise(udp_bridge::Subscribe & subscribe)
+bool BridgeNode::remoteAdvertise(std::shared_ptr<Subscribe::Request> subscribe)
 {
-  return remote_advertise_service_.call(subscribe);
+  auto result = remote_advertise_service_->async_send_request(subscribe);
+  // Wait for the result.
+  if (rclcpp::spin_until_future_complete(node_, result) ==
+    rclcpp::FutureReturnCode::SUCCESS)
+  {
+    return true;
+  } else {
+    return false;
+  }
 }
 
-bool BridgeNode::remoteSubscribe(udp_bridge::Subscribe & subscribe)
+bool BridgeNode::remoteSubscribe(std::shared_ptr<Subscribe::Request> subscribe)
 {
-  return remote_subscribe_service_.call(subscribe);
+  auto result = remote_subscribe_service_->async_send_request(subscribe);
+  // Wait for the result.
+  if (rclcpp::spin_until_future_complete(node_, result) ==
+    rclcpp::FutureReturnCode::SUCCESS)
+  {
+    return true;
+  } else {
+    return false;
+  }
 }
 
 QStringList BridgeNode::topics()
