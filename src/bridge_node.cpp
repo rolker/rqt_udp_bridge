@@ -41,6 +41,7 @@ void BridgeNode::setTopicsPrefix(rclcpp::Node::SharedPtr node, std::string node_
   clear();
 
   local_ = local;
+  node_ = node;
   node_namespace_ = node_namespace;
 
   QStringList labels;
@@ -382,41 +383,21 @@ void BridgeNode::topicStatisticsUpdated()
 
 bool BridgeNode::addRemote(std::shared_ptr<AddRemote::Request> add_remote)
 {
-  auto result = add_remote_service_->async_send_request(add_remote);
-  // Wait for the result.
-  if (rclcpp::spin_until_future_complete(node_, result) ==
-    rclcpp::FutureReturnCode::SUCCESS)
-  {
-    return true;
-  } else {
-    return false;
-  }
+  add_remote_service_->async_send_request(add_remote);
+
+  return true;
 }
 
 bool BridgeNode::remoteAdvertise(std::shared_ptr<Subscribe::Request> subscribe)
 {
-  auto result = remote_advertise_service_->async_send_request(subscribe);
-  // Wait for the result.
-  if (rclcpp::spin_until_future_complete(node_, result) ==
-    rclcpp::FutureReturnCode::SUCCESS)
-  {
-    return true;
-  } else {
-    return false;
-  }
+  remote_advertise_service_->async_send_request(subscribe);
+  return true;
 }
 
 bool BridgeNode::remoteSubscribe(std::shared_ptr<Subscribe::Request> subscribe)
 {
   auto result = remote_subscribe_service_->async_send_request(subscribe);
-  // Wait for the result.
-  if (rclcpp::spin_until_future_complete(node_, result) ==
-    rclcpp::FutureReturnCode::SUCCESS)
-  {
-    return true;
-  } else {
-    return false;
-  }
+  return true;
 }
 
 QStringList BridgeNode::topics()
