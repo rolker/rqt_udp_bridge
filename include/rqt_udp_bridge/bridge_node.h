@@ -95,6 +95,6 @@ private:
   QTimer stale_timer_;
 };
 
-} // namespace rqt_udp_plugin
+} // namespace rqt_udp_bridge
 
 #endif

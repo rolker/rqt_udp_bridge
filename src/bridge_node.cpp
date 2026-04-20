@@ -522,5 +522,5 @@ QStringList BridgeNode::remoteTopics(const std::string &remote)
   return {};
 }
 
-} // namespace rqt_udp_plugin
+} // namespace rqt_udp_bridge
 
