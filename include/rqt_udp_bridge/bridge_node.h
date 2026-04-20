@@ -1,8 +1,10 @@
 #ifndef RQT_UDP_BRIDGE_BRIDGE_NODE_H
 #define RQT_UDP_BRIDGE_BRIDGE_NODE_H
 
+#include <chrono>
 #include <QObject>
 #include <QStandardItemModel>
+#include <QTimer>
 #include "rclcpp/rclcpp.hpp"
 #include "udp_bridge_interfaces/msg/bridge_info.hpp"
 #include "udp_bridge_interfaces/msg/topic_statistics_array.hpp"
@@ -46,10 +48,21 @@ signals:
 private slots:
   void bridgeInfoUpdated();
   void topicStatisticsUpdated();
+  void checkStaleness();
 
 private:
   void bridgeInfoCallback(udp_bridge_interfaces::msg::BridgeInfo::UniquePtr bridge_info);
   void topicStatisticsCallback(udp_bridge_interfaces::msg::TopicStatisticsArray::UniquePtr topic_statistics_array);
+
+  using TimePoint = std::chrono::steady_clock::time_point;
+  static constexpr int TimestampRole = Qt::UserRole + 1;
+
+  void stampItem(QStandardItem* item);
+  void stampChildData(QStandardItem* parent, int row, int column_count, int start_column = 1);
+  void checkModelStaleness(QStandardItemModel& model, int data_column_count, int start_column = 1);
+  void markItemStale(QStandardItem* item, bool stale);
+
+  static constexpr std::chrono::seconds stale_timeout_{5};
 
   /// name of the bridge node as reported by BridgeInfo message
   std::string name_;
@@ -78,6 +91,8 @@ private:
 
   udp_bridge_interfaces::msg::TopicStatisticsArray topic_statistics_array_;
   std::mutex topic_statistics_array_mutex_;
+
+  QTimer stale_timer_;
 };
 
 } // namespace rqt_udp_plugin

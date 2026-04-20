@@ -1,6 +1,8 @@
 #include "rqt_udp_bridge/bridge_node.h"
 #include "udp_bridge_interfaces/srv/add_remote.hpp"
 #include "udp_bridge_interfaces/srv/subscribe.hpp"
+#include <QBrush>
+#include <QColor>
 
 namespace rqt_udp_bridge
 {
@@ -11,6 +13,8 @@ using namespace udp_bridge_interfaces::srv;
 BridgeNode::BridgeNode(QObject* parent):
   QObject(parent)
 {
+  connect(&stale_timer_, &QTimer::timeout, this, &BridgeNode::checkStaleness);
+  stale_timer_.start(2000);
 }
 
 BridgeNode::~BridgeNode()
@@ -20,6 +24,7 @@ BridgeNode::~BridgeNode()
 
 void BridgeNode::clear()
 {
+  stale_timer_.stop();
   local_ = false;
   node_namespace_.clear();
   topic_statistics_subscriber_.reset();
@@ -78,6 +83,8 @@ void BridgeNode::setTopicsPrefix(rclcpp::Node::SharedPtr node, std::string node_
     remote_advertise_service_ = node->create_client<Subscribe>(node_namespace+"/remote_advertise");
     remote_subscribe_service_ = node->create_client<Subscribe>(node_namespace+"/remote_subscribe");
   }
+
+  stale_timer_.start(2000);
 }
 
 QStandardItemModel* BridgeNode::topicsModel()
@@ -148,6 +155,76 @@ void setData(QStandardItemModel& model, int row, const std::vector<QString> &val
     else
       model.item(row, column)->setData(values[i], Qt::DisplayRole);
   }
+}
+
+void BridgeNode::stampItem(QStandardItem* item)
+{
+  auto now = std::chrono::steady_clock::now().time_since_epoch().count();
+  item->setData(static_cast<qlonglong>(now), TimestampRole);
+  markItemStale(item, false);
+}
+
+void BridgeNode::stampChildData(QStandardItem* parent, int row, int column_count, int start_column)
+{
+  for(int i = 0; i < column_count; i++)
+  {
+    int column = start_column + i;
+    auto* child = parent->child(row, column);
+    if(child)
+      stampItem(child);
+  }
+}
+
+void BridgeNode::markItemStale(QStandardItem* item, bool stale)
+{
+  if(stale)
+    item->setData(QBrush(QColor(128, 128, 128)), Qt::ForegroundRole);
+  else
+    item->setData(QVariant(), Qt::ForegroundRole);
+}
+
+void BridgeNode::checkModelStaleness(QStandardItemModel& model, int data_column_count, int start_column)
+{
+  auto now = std::chrono::steady_clock::now();
+  auto check_item = [&](QStandardItem* item)
+  {
+    if(!item)
+      return;
+    auto ts_variant = item->data(TimestampRole);
+    if(!ts_variant.isValid())
+      return;
+    auto ts = TimePoint(TimePoint::duration(ts_variant.toLongLong()));
+    if(now - ts > stale_timeout_)
+      markItemStale(item, true);
+  };
+
+  for(int row = 0; row < model.rowCount(); row++)
+  {
+    for(int col = start_column; col < start_column + data_column_count; col++)
+      check_item(model.item(row, col));
+
+    auto* parent = model.item(row, 0);
+    if(!parent)
+      continue;
+    for(int child_row = 0; child_row < parent->rowCount(); child_row++)
+    {
+      for(int col = start_column; col < start_column + data_column_count; col++)
+        check_item(parent->child(child_row, col));
+
+      auto* child_parent = parent->child(child_row, 0);
+      if(!child_parent)
+        continue;
+      for(int grandchild_row = 0; grandchild_row < child_parent->rowCount(); grandchild_row++)
+        for(int col = start_column; col < start_column + data_column_count; col++)
+          check_item(child_parent->child(grandchild_row, col));
+    }
+  }
+}
+
+void BridgeNode::checkStaleness()
+{
+  checkModelStaleness(topics_model_, 6);    // 6 data columns (messages through avg fragment count)
+  checkModelStaleness(remotes_model_, 11);  // 11 data columns (received through resend sent drop)
 }
 
 void BridgeNode::bridgeInfoCallback(BridgeInfo::UniquePtr bridge_info)
@@ -299,6 +376,7 @@ void BridgeNode::bridgeInfoUpdated()
       values.push_back(humanReadableDataRate(connection.resend.failed_bytes_per_second));
       values.push_back(humanReadableDataRate(connection.resend.dropped_bytes_per_second));
       setChildData(item, connection_item->row(), values);
+      stampChildData(item, connection_item->row(), values.size());
     }
 
     if(local_)
@@ -343,6 +421,9 @@ void BridgeNode::topicStatisticsUpdated()
           values.push_back(QString::number(topic_statistics.messages_per_second)+"/s");
           values.push_back(humanReadableDataRate(topic_statistics.message_bytes_per_second));
           setData(topics_model_, topic_item->row(), values);
+          for(int c = 1; c <= 2; c++)
+            if(auto* item = topics_model_.item(topic_item->row(), c))
+              stampItem(item);
         }
         else
         {
@@ -372,6 +453,7 @@ void BridgeNode::topicStatisticsUpdated()
               values.push_back(humanReadableDataRate(topic_statistics.send.dropped_bytes_per_second));
               values.push_back(QString::number(topic_statistics.average_fragment_count));
               setChildData(remote_item, connection_item->row(), values);
+              stampChildData(remote_item, connection_item->row(), values.size());
             }
           }
         }
