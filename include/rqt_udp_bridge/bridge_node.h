@@ -4,6 +4,10 @@
 #include <chrono>
 #include <QObject>
 #include <QStandardItemModel>
+#include <QList>
+#include <QMetaType>
+#include <QPair>
+#include <QString>
 #include <QTimer>
 #include "rclcpp/rclcpp.hpp"
 #include "udp_bridge_interfaces/msg/bridge_info.hpp"
@@ -13,6 +17,10 @@
 
 namespace rqt_udp_bridge
 {
+
+/// Ordered key/value pairs describing a single remote connection, emitted by
+/// BridgeNode::remoteDetailsUpdated for rendering in a key/value detail table.
+using DetailFields = QList<QPair<QString, QString>>;
 
 class BridgeNode: public QObject
 {
@@ -43,7 +51,10 @@ public:
   QStringList remoteTopics(const std::string &remote);
 
 signals:
-  void remoteDetailsUpdated(QString remote, QString connection, QString details);
+  /// Emitted once per connection on every BridgeInfo update, carrying the
+  /// connection's details as ordered key/value pairs. Consumers (the plugin's
+  /// detail tables) cache by (remote, connection) and render the active one.
+  void remoteDetailsUpdated(QString remote, QString connection, rqt_udp_bridge::DetailFields fields);
 
 private slots:
   void bridgeInfoUpdated();
@@ -96,5 +107,10 @@ private:
 };
 
 } // namespace rqt_udp_bridge
+
+// Allow DetailFields to cross a queued signal/slot connection if one is ever
+// introduced. The current emit path is same-thread (direct), so this is
+// defensive future-proofing rather than a present requirement.
+Q_DECLARE_METATYPE(rqt_udp_bridge::DetailFields)
 
 #endif

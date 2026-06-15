@@ -13,6 +13,7 @@ using namespace udp_bridge_interfaces::srv;
 BridgeNode::BridgeNode(QObject* parent):
   QObject(parent)
 {
+  qRegisterMetaType<DetailFields>();
   connect(&stale_timer_, &QTimer::timeout, this, &BridgeNode::checkStaleness);
   stale_timer_.start(2000);
 }
@@ -359,10 +360,25 @@ void BridgeNode::bridgeInfoUpdated()
         connection_item = new QStandardItem(connection.connection_id.c_str());
         item->appendRow(connection_item);
       }
-      std::stringstream tooltip;
-      tooltip << "remote: " << remote.name << " connection: " << connection.connection_id << " host: " << connection.host << " port: " << connection.port << " ip address: " << connection.ip_address << " return host: " << connection.return_host << " return port: " << connection.return_port << " source ip: " << connection.source_ip_address << " source port: " << connection.source_port << " max rate: " << connection.maximum_bytes_per_second << " bytes/sec";
-      connection_item->setData(tooltip.str().c_str(), Qt::ToolTipRole);
-      emit remoteDetailsUpdated(remote.name.c_str(), connection.connection_id.c_str(), tooltip.str().c_str());
+      // Structured key/value pairs back the detail table; the same data is
+      // joined into a tooltip string for row hover.
+      DetailFields fields;
+      fields.append(qMakePair<QString, QString>("remote", remote.name.c_str()));
+      fields.append(qMakePair<QString, QString>("connection", connection.connection_id.c_str()));
+      fields.append(qMakePair<QString, QString>("host", connection.host.c_str()));
+      fields.append(qMakePair<QString, QString>("port", QString::number(connection.port)));
+      fields.append(qMakePair<QString, QString>("ip address", connection.ip_address.c_str()));
+      fields.append(qMakePair<QString, QString>("return host", connection.return_host.c_str()));
+      fields.append(qMakePair<QString, QString>("return port", QString::number(connection.return_port)));
+      fields.append(qMakePair<QString, QString>("source ip", connection.source_ip_address.c_str()));
+      fields.append(qMakePair<QString, QString>("source port", QString::number(connection.source_port)));
+      fields.append(qMakePair<QString, QString>("max rate", QString::number(connection.maximum_bytes_per_second) + " bytes/sec"));
+
+      QStringList tooltip_parts;
+      for(const auto& field: fields)
+        tooltip_parts << field.first + ": " + field.second;
+      connection_item->setData(tooltip_parts.join(" "), Qt::ToolTipRole);
+      emit remoteDetailsUpdated(remote.name.c_str(), connection.connection_id.c_str(), fields);
       std::vector<QString> values;
       values.push_back(humanReadableDataRate(connection.received_bytes_per_second));
       values.push_back(humanReadableDataRate(connection.duplicate_bytes_per_second));

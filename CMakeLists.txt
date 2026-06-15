@@ -27,11 +27,15 @@ find_package(Qt5 COMPONENTS Widgets REQUIRED)
 set(rqt_udp_bridge_SRCS
   src/udp_bridge_plugin.cpp
   src/bridge_node.cpp
+  src/topic_remote_filter_proxy.cpp
+  src/model_navigation.cpp
 )
 
+# Headers with Q_OBJECT (MOC'd). model_navigation.h has no Q_OBJECT.
 set(rqt_udp_bridge_HDRS
   include/rqt_udp_bridge/udp_bridge_plugin.h
   include/rqt_udp_bridge/bridge_node.h
+  include/rqt_udp_bridge/topic_remote_filter_proxy.h
 )
 
 set(rqt_udp_bridge_UIS
@@ -81,6 +85,26 @@ install(
 )
 
 pluginlib_export_plugin_description_file(rqt_gui "plugin.xml")
+
+if(BUILD_TESTING)
+  find_package(ament_cmake_gtest REQUIRED)
+
+  # MOC the proxy explicitly and disable AUTOMOC on the test target so the
+  # symbol is defined exactly once.
+  qt5_wrap_cpp(rqt_udp_bridge_TEST_MOCS include/rqt_udp_bridge/topic_remote_filter_proxy.h)
+
+  ament_add_gtest(test_model_navigation
+    test/test_model_navigation.cpp
+    src/model_navigation.cpp
+    src/topic_remote_filter_proxy.cpp
+    ${rqt_udp_bridge_TEST_MOCS}
+  )
+  if(TARGET test_model_navigation)
+    set_target_properties(test_model_navigation PROPERTIES AUTOMOC OFF)
+    target_include_directories(test_model_navigation PRIVATE include)
+    target_link_libraries(test_model_navigation Qt5::Widgets)
+  endif()
+endif()
 
 ament_export_include_directories("include/${PROJECT_NAME}")
 ament_export_libraries(${PROJECT_NAME})
