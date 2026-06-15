@@ -35,7 +35,9 @@ header, adds a key/value detail table, and wraps each tree in a filtering proxy
    Per-remote tabs are `QStackedWidget`: empty-state placeholder vs content.
    Remotes tab is a horizontal `QSplitter`: tree + `selectedRemoteDetailsTable`
    (`QTableView`). Each tab gets a filter row (line-edit · Hide idle · Show
-   failing · columns ▾). The `#3030FF` stylesheet disappears with the splitter.
+   failing · columns ▾). The `#3030FF` splitter handle stylesheet is removed
+   from the `ui_.splitter->setStyleSheet(...)` call at `udp_bridge_plugin.cpp:28`
+   (it is set in the `.cpp`, not the `.ui`), along with the old splitter.
 2. **Structured detail accessor in `BridgeNode`** *(settled with Roland)* —
    in the same loop at `bridge_node.cpp:362-364`, keep the tooltip string
    (still used for row hover) but additionally emit structured pairs. Change
@@ -43,7 +45,13 @@ header, adds a key/value detail table, and wraps each tree in a filtering proxy
    QList<QPair<QString,QString>> fields)`. A small `QStandardItemModel`
    (key|value) in the plugin rebuilds on that signal and backs
    `selectedRemoteDetailsTable`. `selectedRemotedetailsLabel` and the string
-   form of the signal are removed. No re-parsing in the view.
+   form of the signal are removed. No re-parsing in the view. The **remote-remote
+   (Peers @) detail pane converts too** (`selectedRemoteRemoteDetailsLabel` →
+   key/value table): `remoteDetailsUpdated` is consumed by both
+   `updateCurrentRemoteDetails` and `updateCurrentRemoteRemoteDetails`
+   (`udp_bridge_plugin.cpp:309`), so the signature change forces reworking the
+   remote-remote handler regardless — keeping it a label would leave a
+   half-migrated signal. Convert both for one clean signal.
 3. **Stable per-tree `QSortFilterProxyModel`** — one proxy per tree, created
    once in `initPlugin` and never rebuilt. On node/remote change call
    `proxy->setSourceModel(newModel)` (not `view->setModel(newProxy)`), so
@@ -81,8 +89,8 @@ header, adds a key/value detail table, and wraps each tree in a filtering proxy
 
 | File | Change |
 |------|--------|
-| `src/udp_bridge_plugin.ui` | Splitter → tabs + header strip + per-tab filter rows + detail `QTableView`; drop `#3030FF` |
-| `src/udp_bridge_plugin.cpp` | Proxy wiring, `mapToSource` in helpers, combo SSOT, filter slots, detail-table model, settings keys |
+| `src/udp_bridge_plugin.ui` | Splitter → tabs + header strip + per-tab filter rows + detail `QTableView` (both remote and remote-remote) |
+| `src/udp_bridge_plugin.cpp` | Proxy wiring, `mapToSource` in helpers, combo SSOT, filter slots, detail-table models, settings keys, remove `#3030FF` `setStyleSheet` (l.28) |
 | `include/rqt_udp_bridge/udp_bridge_plugin.h` | Proxy members, detail model, filter-state fields; new slots |
 | `src/bridge_node.cpp` | Emit structured detail pairs alongside tooltip string (l.362-365) |
 | `include/rqt_udp_bridge/bridge_node.h` | Change `remoteDetailsUpdated` signature to carry key/value pairs |
@@ -113,19 +121,23 @@ header, adds a key/value detail table, and wraps each tree in a filtering proxy
 | If we change... | Also update... | Included? |
 |---|---|---|
 | `remoteDetailsUpdated` signature | `updateCurrentRemoteDetails` + `updateCurrentRemoteRemoteDetails` callers | Yes |
-| `selectedRemotedetailsLabel` removed | `selectedRemoteRemoteDetailsLabel` (remote-remote detail) — mirror to a table or keep label for 1A? | **Open question** |
+| `selectedRemotedetailsLabel` removed | `selectedRemoteRemoteDetailsLabel` → also converted to key/value table (signal change forces it) | Yes |
 | `.ui` object names | any `instance_settings` keys referencing them | Yes (settings step) |
 | plugin layout | `udp_bridge` README screenshot | No — PR note, follow-up |
 
 ## Open Questions
 
-- The **remote-remote** detail pane (`selectedRemoteRemoteDetailsLabel`,
-  Peers @ tab) uses the same concatenated-string path. Convert it to a
-  key/value table too in 1A for consistency, or leave it as a label this PR
-  and migrate in 1B? Leaning: convert both now (same accessor, marginal cost).
-- Is `launch_testing` smoke feasible in this repo's CI, or is the GTest
-  index-mapping test the only automated coverage for 1A? (CI currently builds
-  on `jazzy`; no existing test dir.)
+*(Both resolved during review-plan — [PR #6](https://github.com/rolker/rqt_udp_bridge/pull/6) `## Plan Review`, `76cb766`.)*
+
+- ~~Convert the remote-remote (Peers @) detail pane in 1A, or defer?~~
+  **Resolved: convert both now.** `remoteDetailsUpdated` feeds both the remote
+  and remote-remote handlers, so the signature change forces touching
+  `updateCurrentRemoteRemoteDetails` regardless — "keep it a label" would only
+  leave a half-migrated signal. Folded into Approach step 2.
+- ~~`launch_testing` smoke vs. GTest-only coverage?~~ **Resolved: timeboxed to
+  implementation.** The committed GTest proxy index-mapping test is the
+  guaranteed 1A coverage; add a `launch_testing` load-smoke only if it drops in
+  cheaply on `jazzy` CI (no existing test dir), else skip without blocking.
 
 ## Estimated Scope
 
