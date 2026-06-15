@@ -94,8 +94,10 @@ header, adds a key/value detail table, and wraps each tree in a filtering proxy
 | `include/rqt_udp_bridge/udp_bridge_plugin.h` | Proxy members, detail model, filter-state fields; new slots |
 | `src/bridge_node.cpp` | Emit structured detail pairs alongside tooltip string (l.362-365) |
 | `include/rqt_udp_bridge/bridge_node.h` | Change `remoteDetailsUpdated` signature to carry key/value pairs |
-| new: `src/topic_remote_filter_proxy.{h,cpp}` | `QSortFilterProxyModel` subclass (idle/failing predicates) |
-| new: `test/test_index_mapping.cpp` + `CMakeLists.txt` | GTest for proxy index→source tree-walk |
+| `include/rqt_udp_bridge/topic_remote_filter_proxy.h` + `src/topic_remote_filter_proxy.cpp` | `QSortFilterProxyModel` subclass (text/idle/failing predicates, recursive) |
+| `include/rqt_udp_bridge/model_navigation.h` + `src/model_navigation.cpp` | Tree-walk extracted to free functions (`mapToSource`, `remoteConnectionAt`, `topicRemoteConnectionAt`) so it is unit-testable; the plugin's helpers delegate here |
+| `test/test_model_navigation.cpp` | GTest: proxy index→source mapping (incl. row-shift regression) + filter predicates |
+| `CMakeLists.txt` / `package.xml` | New sources + MOC header; `ament_cmake_gtest` test target and `test_depend` |
 
 ## Principles Self-Check
 
@@ -143,3 +145,21 @@ header, adds a key/value detail table, and wraps each tree in a filtering proxy
 
 Single PR (PR 1A). Sizable view-layer rewrite but coherent; the proxy/detail
 plumbing must land together. PR 1B and Phase 2 follow on the same issue.
+
+## Implementation Notes
+
+- **`launch_testing` smoke skipped.** No existing test dir and a plugin load
+  needs a display; the GTest (`test_model_navigation.cpp`, 8 cases) is the
+  automated 1A coverage. Plugin-load + live-bridge behavior is the manual smoke
+  checklist on the issue.
+- **"Hide idle" reuses the staleness machinery, not a wall clock.** A leaf is
+  "active" iff a data cell has a valid `TimestampRole` and *no* grey
+  `ForegroundRole` — i.e. exactly the cells `BridgeNode::checkStaleness` keeps
+  fresh. This ties the filter to the same greying users already see and avoids a
+  second clock in the proxy. The "0 Bps" sentinel for "show failing" is coupled
+  to `humanReadableDataRate(0)`; both couplings are documented in
+  `topic_remote_filter_proxy.h`.
+- **Detail responsiveness via a cache.** `remoteDetailsUpdated` fires for every
+  connection each `BridgeInfo`; the plugin caches all of them by
+  (remote, connection) so selecting a row fills the detail table immediately
+  rather than waiting for the next update.

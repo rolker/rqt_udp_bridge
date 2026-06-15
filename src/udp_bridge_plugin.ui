@@ -72,94 +72,53 @@
     </widget>
    </item>
    <item>
-    <widget class="QSplitter" name="splitter">
-     <property name="orientation">
-      <enum>Qt::Vertical</enum>
+    <widget class="QFrame" name="headerFrame">
+     <property name="frameShape">
+      <enum>QFrame::StyledPanel</enum>
      </property>
-     <property name="handleWidth">
-      <number>5</number>
+     <layout class="QHBoxLayout" name="headerLayout">
+      <item>
+       <widget class="QLabel" name="activeRemoteCaptionLabel">
+        <property name="text">
+         <string>Selected remote:</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QComboBox" name="activeRemoteComboBox">
+        <property name="sizeAdjustPolicy">
+         <enum>QComboBox::AdjustToContents</enum>
+        </property>
+        <property name="minimumContentsLength">
+         <number>12</number>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="headlineStatsLabel">
+        <property name="text">
+         <string/>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QTabWidget" name="tabWidget">
+     <property name="currentIndex">
+      <number>0</number>
      </property>
-     <widget class="QGroupBox" name="localTopicsGroupBox">
-      <property name="sizePolicy">
-       <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-        <horstretch>0</horstretch>
-        <verstretch>2</verstretch>
-       </sizepolicy>
-      </property>
-      <property name="title">
+     <widget class="QWidget" name="localTopicsTab">
+      <attribute name="title">
        <string>Local Topics</string>
-      </property>
-      <layout class="QHBoxLayout" name="horizontalLayout_3">
+      </attribute>
+      <layout class="QVBoxLayout" name="localTopicsLayout">
        <item>
         <widget class="QTreeView" name="localTopicsTreeView">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="selectionMode">
-          <enum>QAbstractItemView::SingleSelection</enum>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </widget>
-     <widget class="QGroupBox" name="remotesGroupBox">
-      <property name="sizePolicy">
-       <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-        <horstretch>0</horstretch>
-        <verstretch>1</verstretch>
-       </sizepolicy>
-      </property>
-      <property name="title">
-       <string>Remotes</string>
-      </property>
-      <layout class="QVBoxLayout" name="verticalLayout_2">
-       <item>
-        <widget class="QTreeView" name="remotesTreeView">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="selectionMode">
-          <enum>QAbstractItemView::SingleSelection</enum>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QLabel" name="selectedRemotedetailsLabel">
-         <property name="text">
-          <string/>
-         </property>
-         <property name="textInteractionFlags">
-          <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByMouse</set>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </widget>
-     <widget class="QGroupBox" name="remoteTopicsGroupBox">
-      <property name="sizePolicy">
-       <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-        <horstretch>0</horstretch>
-        <verstretch>2</verstretch>
-       </sizepolicy>
-      </property>
-      <property name="title">
-       <string>Remote Topics</string>
-      </property>
-      <layout class="QHBoxLayout" name="horizontalLayout_4">
-       <item>
-        <widget class="QTreeView" name="remoteTopicsTreeView">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
          <property name="selectionMode">
           <enum>QAbstractItemView::SingleSelection</enum>
          </property>
@@ -170,35 +129,141 @@
        </item>
       </layout>
      </widget>
-     <widget class="QGroupBox" name="remoteRemotesGroupBox">
-      <property name="sizePolicy">
-       <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-        <horstretch>0</horstretch>
-        <verstretch>1</verstretch>
-       </sizepolicy>
-      </property>
-      <property name="title">
-       <string>Remote Remotes</string>
-      </property>
-      <layout class="QVBoxLayout" name="verticalLayout_3">
+     <widget class="QWidget" name="remotesTab">
+      <attribute name="title">
+       <string>Remotes</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="remotesLayout">
        <item>
-        <widget class="QTreeView" name="remoteRemotesTreeView">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
+        <widget class="QSplitter" name="remotesSplitter">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
          </property>
+         <widget class="QTreeView" name="remotesTreeView">
+          <property name="selectionMode">
+           <enum>QAbstractItemView::SingleSelection</enum>
+          </property>
+          <property name="selectionBehavior">
+           <enum>QAbstractItemView::SelectRows</enum>
+          </property>
+         </widget>
+         <widget class="QTableView" name="selectedRemoteDetailsTable">
+          <property name="editTriggers">
+           <set>QAbstractItemView::NoEditTriggers</set>
+          </property>
+          <property name="selectionBehavior">
+           <enum>QAbstractItemView::SelectRows</enum>
+          </property>
+          <attribute name="horizontalHeaderStretchLastSection">
+           <bool>true</bool>
+          </attribute>
+          <attribute name="verticalHeaderVisible">
+           <bool>false</bool>
+          </attribute>
+         </widget>
         </widget>
        </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="remoteTopicsTab">
+      <attribute name="title">
+       <string>Topics @ —</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="remoteTopicsTabLayout">
        <item>
-        <widget class="QLabel" name="selectedRemoteRemoteDetailsLabel">
-         <property name="text">
-          <string/>
+        <widget class="QStackedWidget" name="remoteTopicsStack">
+         <property name="currentIndex">
+          <number>0</number>
          </property>
-         <property name="textInteractionFlags">
-          <set>Qt::LinksAccessibleByMouse|Qt::TextSelectableByMouse</set>
+         <widget class="QWidget" name="remoteTopicsEmptyPage">
+          <layout class="QVBoxLayout" name="remoteTopicsEmptyLayout">
+           <item>
+            <widget class="QLabel" name="remoteTopicsEmptyLabel">
+             <property name="text">
+              <string>Select a remote to view its topics.</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignCenter</set>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+         <widget class="QWidget" name="remoteTopicsContentPage">
+          <layout class="QVBoxLayout" name="remoteTopicsLayout">
+           <item>
+            <widget class="QTreeView" name="remoteTopicsTreeView">
+             <property name="selectionMode">
+              <enum>QAbstractItemView::SingleSelection</enum>
+             </property>
+             <property name="selectionBehavior">
+              <enum>QAbstractItemView::SelectRows</enum>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+     <widget class="QWidget" name="remoteRemotesTab">
+      <attribute name="title">
+       <string>Peers @ —</string>
+      </attribute>
+      <layout class="QVBoxLayout" name="remoteRemotesTabLayout">
+       <item>
+        <widget class="QStackedWidget" name="remoteRemotesStack">
+         <property name="currentIndex">
+          <number>0</number>
          </property>
+         <widget class="QWidget" name="remoteRemotesEmptyPage">
+          <layout class="QVBoxLayout" name="remoteRemotesEmptyLayout">
+           <item>
+            <widget class="QLabel" name="remoteRemotesEmptyLabel">
+             <property name="text">
+              <string>Select a remote to view its peers.</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignCenter</set>
+             </property>
+            </widget>
+           </item>
+          </layout>
+         </widget>
+         <widget class="QWidget" name="remoteRemotesContentPage">
+          <layout class="QVBoxLayout" name="remoteRemotesLayout">
+           <item>
+            <widget class="QSplitter" name="remoteRemotesSplitter">
+             <property name="orientation">
+              <enum>Qt::Horizontal</enum>
+             </property>
+             <widget class="QTreeView" name="remoteRemotesTreeView">
+              <property name="selectionMode">
+               <enum>QAbstractItemView::SingleSelection</enum>
+              </property>
+              <property name="selectionBehavior">
+               <enum>QAbstractItemView::SelectRows</enum>
+              </property>
+             </widget>
+             <widget class="QTableView" name="selectedRemoteRemoteDetailsTable">
+              <property name="editTriggers">
+               <set>QAbstractItemView::NoEditTriggers</set>
+              </property>
+              <property name="selectionBehavior">
+               <enum>QAbstractItemView::SelectRows</enum>
+              </property>
+              <attribute name="horizontalHeaderStretchLastSection">
+               <bool>true</bool>
+              </attribute>
+              <attribute name="verticalHeaderVisible">
+               <bool>false</bool>
+              </attribute>
+             </widget>
+            </widget>
+           </item>
+          </layout>
+         </widget>
         </widget>
        </item>
       </layout>
