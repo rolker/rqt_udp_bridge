@@ -13,6 +13,7 @@ using namespace udp_bridge_interfaces::srv;
 BridgeNode::BridgeNode(QObject* parent):
   QObject(parent)
 {
+  qRegisterMetaType<DetailFields>();
   connect(&stale_timer_, &QTimer::timeout, this, &BridgeNode::checkStaleness);
   stale_timer_.start(2000);
 }

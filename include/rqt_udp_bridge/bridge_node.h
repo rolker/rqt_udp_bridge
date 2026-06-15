@@ -5,6 +5,7 @@
 #include <QObject>
 #include <QStandardItemModel>
 #include <QList>
+#include <QMetaType>
 #include <QPair>
 #include <QString>
 #include <QTimer>
@@ -106,5 +107,10 @@ private:
 };
 
 } // namespace rqt_udp_bridge
+
+// Allow DetailFields to cross a queued signal/slot connection if one is ever
+// introduced. The current emit path is same-thread (direct), so this is
+// defensive future-proofing rather than a present requirement.
+Q_DECLARE_METATYPE(rqt_udp_bridge::DetailFields)
 
 #endif
