@@ -106,6 +106,17 @@ void UDPBridgePlugin::initPlugin(qt_gui_cpp::PluginContext& context)
   // The header combo is the single source of truth for the active remote.
   connect(ui_.activeRemoteComboBox, &QComboBox::currentTextChanged, this, &UDPBridgePlugin::setActiveRemote);
 
+  // Wire the Remote Subscribe / Remote Advertise buttons to the dialog. These
+  // exist in udp_bridge_plugin.ui but lost their connections in the tab-layout
+  // rework (4170587); without this, clicking them does nothing. Use lambdas so
+  // the QPushButton::clicked(bool checked) signal does not leak into subscribe()'s
+  // remote_advertise argument.
+  connect(ui_.subscribePushButton, &QPushButton::clicked, this, [this]() { subscribe(false); });
+  connect(ui_.advertisePushButton, &QPushButton::clicked, this, [this]() { subscribe(true); });
+  // "Add Connection" lost its wiring in the same 4170587 rework; addRemote()
+  // takes no args, so connect directly to the slot.
+  connect(ui_.addRemotePushButton, &QPushButton::clicked, this, &UDPBridgePlugin::addRemote);
+
   // Selection models are stable (the proxy is never replaced), so connect once.
   connect(ui_.remotesTreeView->selectionModel(), &QItemSelectionModel::currentChanged, this, &UDPBridgePlugin::currentRemoteChanged);
   connect(ui_.localTopicsTreeView->selectionModel(), &QItemSelectionModel::currentChanged, this, &UDPBridgePlugin::currentLocalTopicChanged);
