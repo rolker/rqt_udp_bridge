@@ -113,6 +113,9 @@ void UDPBridgePlugin::initPlugin(qt_gui_cpp::PluginContext& context)
   // remote_advertise argument.
   connect(ui_.subscribePushButton, &QPushButton::clicked, this, [this]() { subscribe(false); });
   connect(ui_.advertisePushButton, &QPushButton::clicked, this, [this]() { subscribe(true); });
+  // "Add Connection" lost its wiring in the same 4170587 rework; addRemote()
+  // takes no args, so connect directly to the slot.
+  connect(ui_.addRemotePushButton, &QPushButton::clicked, this, &UDPBridgePlugin::addRemote);
 
   // Selection models are stable (the proxy is never replaced), so connect once.
   connect(ui_.remotesTreeView->selectionModel(), &QItemSelectionModel::currentChanged, this, &UDPBridgePlugin::currentRemoteChanged);
