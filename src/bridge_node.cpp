@@ -237,8 +237,20 @@ void BridgeNode::bridgeInfoCallback(BridgeInfo::UniquePtr bridge_info)
 
 void BridgeNode::bridgeInfoUpdated()
 {
-  std::lock_guard<std::mutex> lock(bridge_info_mutex_);
-  name_ = bridge_info_.name;
+  // Copy the shared message under the lock, then release it before touching any
+  // Qt models or emitting signals. Holding bridge_info_mutex_ across the model
+  // updates below is a self-deadlock: appendRow()/removeRow() emit
+  // rowsInserted/rowsRemoved, which are wired (same thread, direct connection)
+  // to UDPBridgePlugin::refreshActiveRemoteCombo() -> setActiveRemote() ->
+  // BridgeNode::connections(), and connections() re-locks this same
+  // (non-recursive) mutex on the GUI thread. Releasing first also unblocks the
+  // executor thread's bridgeInfoCallback() instead of making it wait on us.
+  udp_bridge_interfaces::msg::BridgeInfo bridge_info;
+  {
+    std::lock_guard<std::mutex> lock(bridge_info_mutex_);
+    bridge_info = bridge_info_;
+  }
+  name_ = bridge_info.name;
 
   std::map<std::string, bool> existing_topics;
   for(int i = 0; i < topics_model_.rowCount(); i++)
@@ -251,7 +263,7 @@ void BridgeNode::bridgeInfoUpdated()
     }
   }
 
-  for(const auto& topic: bridge_info_.topics)
+  for(const auto& topic: bridge_info.topics)
   {
     existing_topics[topic.topic] = true;
     auto items = topics_model_.findItems(topic.topic.c_str());
@@ -330,9 +342,27 @@ void BridgeNode::bridgeInfoUpdated()
     }
   }
 
-  for(const auto& remote: bridge_info_.remotes)
+  for(const auto& remote: bridge_info.remotes)
   {
     existing_remotes[remote.name] = true;
+
+    // Create the per-remote child node before appendRow() below. appendRow()
+    // synchronously emits rowsInserted, which (via the plugin's
+    // refreshActiveRemoteCombo -> setActiveRemote) can activate this remote when
+    // it matches a restored active-remote selection, and setActiveRemote binds
+    // the per-remote tab models from remoteTopicsModel()/remoteRemotesModel().
+    // If the child node does not exist yet those return nullptr and the Topics/
+    // Peers tabs bind to an empty model that never repopulates.
+    if(local_)
+    {
+      auto remote_iterator = remotes_.find(remote.name);
+      if(remote_iterator == remotes_.end())
+      {
+        remotes_[remote.name] = new BridgeNode(this);
+        remotes_[remote.name]->setTopicsPrefix(node_, node_namespace_+"/remotes/"+remote.topic_name, false);
+      }
+    }
+
     auto items = remotes_model_.findItems(remote.name.c_str());
     QStandardItem* item = nullptr;
     for(auto i: items)
@@ -394,17 +424,6 @@ void BridgeNode::bridgeInfoUpdated()
       setChildData(item, connection_item->row(), values);
       stampChildData(item, connection_item->row(), values.size());
     }
-
-    if(local_)
-    {
-      auto remote_iterator = remotes_.find(remote.name);
-      if(remote_iterator == remotes_.end())
-      {
-        remotes_[remote.name] = new BridgeNode(this);
-        remotes_[remote.name]->setTopicsPrefix(node_, node_namespace_+"/remotes/"+remote.topic_name, false);
-      }
-    }
-
   }
 }
 
@@ -417,8 +436,16 @@ void BridgeNode::topicStatisticsCallback(TopicStatisticsArray::UniquePtr topic_s
 
 void BridgeNode::topicStatisticsUpdated()
 {
-  std::lock_guard<std::mutex> lock(topic_statistics_array_mutex_);
-  for(const auto& topic_statistics: topic_statistics_array_.topics)
+  // Copy under the lock and release before the model updates below, for the same
+  // reasons as bridgeInfoUpdated(): the setData()/setChildData() calls emit Qt
+  // model signals that re-enter plugin code, and holding the mutex needlessly
+  // blocks the executor thread's topicStatisticsCallback().
+  udp_bridge_interfaces::msg::TopicStatisticsArray topic_statistics_array;
+  {
+    std::lock_guard<std::mutex> lock(topic_statistics_array_mutex_);
+    topic_statistics_array = topic_statistics_array_;
+  }
+  for(const auto& topic_statistics: topic_statistics_array.topics)
     if(!name_.empty() && topic_statistics.source_node == name_)
     {
       QStandardItem* topic_item = nullptr;
