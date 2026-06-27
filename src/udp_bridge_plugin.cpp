@@ -151,6 +151,12 @@ UDPBridgePlugin::FilterControls UDPBridgePlugin::buildFilterRow(QBoxLayout* layo
 {
   FilterControls controls;
   auto* row = new QWidget(widget_);
+  // Pin the filter row to its natural height. Without this it shares vertical
+  // stretch with whatever sits below it; that is harmless when the sibling is a
+  // QTreeView (Expanding, so it claims the slack), but on the Remotes/Peers tabs
+  // the sibling is a horizontal QSplitter that does not expand vertically, so the
+  // row would otherwise grab half the tab's height.
+  row->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
   auto* row_layout = new QHBoxLayout(row);
   row_layout->setContentsMargins(0, 0, 0, 0);
 
