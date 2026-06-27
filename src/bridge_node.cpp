@@ -345,6 +345,24 @@ void BridgeNode::bridgeInfoUpdated()
   for(const auto& remote: bridge_info.remotes)
   {
     existing_remotes[remote.name] = true;
+
+    // Create the per-remote child node before appendRow() below. appendRow()
+    // synchronously emits rowsInserted, which (via the plugin's
+    // refreshActiveRemoteCombo -> setActiveRemote) can activate this remote when
+    // it matches a restored active-remote selection, and setActiveRemote binds
+    // the per-remote tab models from remoteTopicsModel()/remoteRemotesModel().
+    // If the child node does not exist yet those return nullptr and the Topics/
+    // Peers tabs bind to an empty model that never repopulates.
+    if(local_)
+    {
+      auto remote_iterator = remotes_.find(remote.name);
+      if(remote_iterator == remotes_.end())
+      {
+        remotes_[remote.name] = new BridgeNode(this);
+        remotes_[remote.name]->setTopicsPrefix(node_, node_namespace_+"/remotes/"+remote.topic_name, false);
+      }
+    }
+
     auto items = remotes_model_.findItems(remote.name.c_str());
     QStandardItem* item = nullptr;
     for(auto i: items)
@@ -406,17 +424,6 @@ void BridgeNode::bridgeInfoUpdated()
       setChildData(item, connection_item->row(), values);
       stampChildData(item, connection_item->row(), values.size());
     }
-
-    if(local_)
-    {
-      auto remote_iterator = remotes_.find(remote.name);
-      if(remote_iterator == remotes_.end())
-      {
-        remotes_[remote.name] = new BridgeNode(this);
-        remotes_[remote.name]->setTopicsPrefix(node_, node_namespace_+"/remotes/"+remote.topic_name, false);
-      }
-    }
-
   }
 }
 
